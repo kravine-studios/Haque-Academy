@@ -4,6 +4,7 @@ import { useInView } from './useInView';
 import { useAdmin } from '../lib/AdminContext';
 import {
   fetchAnnualEvents,
+  getLocalEvents,
   addAnnualEvent,
   updateAnnualEvent,
   deleteAnnualEvent,
@@ -341,15 +342,19 @@ export default function ActivitiesSection() {
   const { loggedIn, editMode } = useAdmin();
   const { ref: titleRef, inView: titleInView } = useInView(0.2);
 
-  const [events, setEvents] = useState<AnnualEvent[]>([]);
-  const [loadingEvents, setLoadingEvents] = useState(true);
+  const [events, setEvents] = useState<AnnualEvent[]>(() => {
+    if (typeof window !== 'undefined') {
+      return getLocalEvents();
+    }
+    return [];
+  });
+  const [loadingEvents, setLoadingEvents] = useState(false);
   const [showEventForm, setShowEventForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState<AnnualEvent | null>(null);
 
   const loadEvents = async () => {
-    setLoadingEvents(true);
-    setEvents(await fetchAnnualEvents());
-    setLoadingEvents(false);
+    const data = await fetchAnnualEvents();
+    setEvents(data);
   };
 
   useEffect(() => {
@@ -513,8 +518,8 @@ export default function ActivitiesSection() {
                             onClick={async (e) => {
                               e.stopPropagation();
                               if (confirm(`Delete the event "${event.name}"?`)) {
+                                setEvents((prev) => prev.filter((ev) => ev.id !== event.id));
                                 await deleteAnnualEvent(event.id);
-                                loadEvents();
                               }
                             }}
                             className="w-8 h-8 rounded-full bg-white shadow-md border border-gray-100 flex items-center justify-center hover:bg-red-50 hover:text-red-600 hover:scale-105 active:scale-95 transition-transform cursor-pointer"

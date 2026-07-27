@@ -182,7 +182,7 @@ const DEFAULT_EVENTS: Omit<AnnualEvent, 'id'>[] = [
 
 const EVENTS_LOCAL_KEY = 'haque:annual_events_v2';
 
-function getLocalEvents(): AnnualEvent[] {
+export function getLocalEvents(): AnnualEvent[] {
   const data = localStorage.getItem(EVENTS_LOCAL_KEY);
   if (!data) {
     // Generate UUIDs for default events
@@ -230,72 +230,12 @@ export async function fetchAnnualEvents(): Promise<AnnualEvent[]> {
       .order('created_at', { ascending: true });
 
     if (error) {
-      // If table doesn't exist or other error, fall back to local
       console.warn('Supabase fetchAnnualEvents failed, falling back to localStorage:', error.message);
       return getLocalEvents();
     }
 
-    const localList = getLocalEvents();
-
-    // 1. If Supabase table has 0 records, seed local or default events to Supabase
-    if (dbData && dbData.length === 0) {
-      console.log('annual_events table is empty in Supabase, syncing to Supabase...');
-      const itemsToSync = localList.length > 0 ? localList : DEFAULT_EVENTS.map(ev => ({ ...ev, id: '' }));
-      const seeded: AnnualEvent[] = [];
-      for (const ev of itemsToSync) {
-        let iconName = ev.icon_name;
-        if (iconName && iconName.startsWith('data:image/')) {
-          const uploadedUrl = await uploadBase64Image(iconName);
-          if (uploadedUrl) iconName = uploadedUrl;
-        }
-        const { data: inserted } = await supabase
-          .from('annual_events')
-          .insert({
-            name: ev.name,
-            icon_name: iconName,
-            color: ev.color,
-          })
-          .select()
-          .single();
-        if (inserted) {
-          seeded.push(inserted as AnnualEvent);
-        }
-      }
-      if (seeded.length > 0) {
-        saveLocalEvents(seeded);
-        return seeded;
-      }
-    }
-
-    // 2. If Supabase table has records, check if any local events in localStorage are missing from DB
-    if (dbData && dbData.length > 0) {
+    if (dbData) {
       const dbEvents = dbData as AnnualEvent[];
-      const dbNames = new Set(dbEvents.map(e => e.name.toLowerCase().trim()));
-
-      const missingLocal = localList.filter(le => !dbNames.has(le.name.toLowerCase().trim()));
-      if (missingLocal.length > 0) {
-        console.log(`Syncing ${missingLocal.length} unsynced local event(s) to Supabase...`);
-        for (const missing of missingLocal) {
-          let iconName = missing.icon_name;
-          if (iconName && iconName.startsWith('data:image/')) {
-            const uploadedUrl = await uploadBase64Image(iconName);
-            if (uploadedUrl) iconName = uploadedUrl;
-          }
-          const { data: inserted } = await supabase
-            .from('annual_events')
-            .insert({
-              name: missing.name,
-              icon_name: iconName,
-              color: missing.color,
-            })
-            .select()
-            .single();
-          if (inserted) {
-            dbEvents.push(inserted as AnnualEvent);
-          }
-        }
-      }
-
       saveLocalEvents(dbEvents);
       return dbEvents;
     }
