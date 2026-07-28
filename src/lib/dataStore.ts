@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { supabase, supabaseConfigured } from './supabaseClient';
 
 export interface GalleryItem {
   id: string;
@@ -318,6 +318,19 @@ export async function updateAnnualEvent(id: string, updatedFields: Partial<Omit<
 
 export async function deleteAnnualEvent(id: string): Promise<boolean> {
   let success = false;
+
+  // Check if target event has a storage image to clean up
+  const existingList = getLocalEvents();
+  const targetEvent = existingList.find(e => e.id === id);
+  if (targetEvent?.icon_name && targetEvent.icon_name.includes('/storage/v1/object/public/gallery/')) {
+    const parts = targetEvent.icon_name.split('/storage/v1/object/public/gallery/');
+    if (parts[1]) {
+      supabase.storage.from('gallery').remove([parts[1]]).catch(err => {
+        console.warn('Storage delete cleanup notice:', err);
+      });
+    }
+  }
+
   try {
     const { error } = await supabase.from('annual_events').delete().eq('id', id);
     if (!error) {
@@ -348,4 +361,18 @@ export function notifyEventsChanged(): void {
 export function onEventsChanged(callback: () => void): () => void {
   window.addEventListener('haque:events-changed', callback);
   return () => window.removeEventListener('haque:events-changed', callback);
+}
+
+// Setup Realtime Listener for cross-device synchronization
+if (typeof window !== 'undefined' && supabaseConfigured) {
+  try {
+    supabase
+      .channel('public:annual_events')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'annual_events' }, () => {
+        notifyEventsChanged();
+      })
+      .subscribe();
+  } catch (e) {
+    console.warn('Realtime subscription setup failed:', e);
+  }
 }

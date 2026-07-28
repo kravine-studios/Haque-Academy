@@ -78,41 +78,19 @@ const suggestIcon = (eventName: string): string => {
   return 'Calendar'; // default fallback
 };
 
-export const getEventImage = (iconName: string, eventName: string): string | null => {
+export const getEventImage = (iconName: string, _eventName: string): string | null => {
   if (!iconName) return null;
-  if (iconName.startsWith('http://') || iconName.startsWith('https://') || iconName.startsWith('data:image/') || iconName.startsWith('/')) {
+  if (
+    iconName.startsWith('http://') ||
+    iconName.startsWith('https://') ||
+    iconName.startsWith('data:image/') ||
+    iconName.startsWith('/')
+  ) {
     return iconName;
   }
-  
-  const nameLower = eventName.toLowerCase();
-  
-  if (nameLower.includes('science') || nameLower.includes('exhibition') || nameLower.includes('lab') || nameLower.includes('fair') || iconName === 'FlaskConical') {
-    return 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=600&auto=format&fit=crop&q=80';
-  }
-  if (nameLower.includes('republic') || (iconName === 'Flag' && nameLower.includes('republic'))) {
-    return 'https://images.unsplash.com/photo-1599661046289-e31897846e41?w=600&auto=format&fit=crop&q=80';
-  }
-  if (nameLower.includes('independence') || iconName === 'Flag') {
-    return 'https://images.unsplash.com/photo-1532375810709-75b1da00537c?w=600&auto=format&fit=crop&q=80';
-  }
-  if (nameLower.includes('foundation') || nameLower.includes('school') || iconName === 'Calendar') {
-    return 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=600&auto=format&fit=crop&q=80';
-  }
-  if (nameLower.includes('ramazan') || nameLower.includes('iftaar') || iconName === 'Moon') {
-    return 'https://images.unsplash.com/photo-1581078426770-6d336e5de7bf?w=600&auto=format&fit=crop&q=80';
-  }
-  if (nameLower.includes('annual') || nameLower.includes('celebration') || iconName === 'GraduationCap' || iconName === 'Sparkles') {
-    return 'https://images.unsplash.com/photo-1511578314322-379afb476865?w=600&auto=format&fit=crop&q=80';
-  }
-  if (iconName === 'Award') {
-    return 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=600&auto=format&fit=crop&q=80';
-  }
-  if (iconName === 'Trophy') {
-    return 'https://images.unsplash.com/photo-1460518451285-cd7af7f0f3ad?w=600&auto=format&fit=crop&q=80';
-  }
-  
   return null;
 };
+
 
 
 function EventForm({
