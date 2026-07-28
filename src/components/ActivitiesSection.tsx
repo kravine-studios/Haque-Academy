@@ -80,6 +80,7 @@ const suggestIcon = (eventName: string): string => {
 
 export const getEventImage = (iconName: string, _eventName: string): string | null => {
   if (!iconName) return null;
+  if (iconName.includes('images.unsplash.com/photo-')) return null;
   if (
     iconName.startsWith('http://') ||
     iconName.startsWith('https://') ||
@@ -202,7 +203,7 @@ function EventForm({
           <div className="flex items-center gap-4 p-3 bg-gray-50 border border-gray-200 rounded-xl">
             {/* Preview */}
             <div className="shrink-0">
-              {iconName && (iconName.startsWith('http://') || iconName.startsWith('https://') || iconName.startsWith('data:image/') || iconName.startsWith('/')) ? (
+              {iconName && (iconName.startsWith('http://') || iconName.startsWith('https://') || iconName.startsWith('data:image/') || iconName.startsWith('/')) && !iconName.includes('images.unsplash.com/photo-') ? (
                 <img
                   src={iconName}
                   alt="Preview"
@@ -268,12 +269,13 @@ function EventForm({
                   <button
                     type="button"
                     onClick={() => {
-                      setIconName('Calendar');
-                      setIsIconManuallySet(false);
+                      const suggested = suggestIcon(name);
+                      setIconName(suggested);
+                      setIsIconManuallySet(true);
                     }}
                     className="px-2.5 py-1.5 bg-white hover:bg-red-50 text-red-600 hover:text-red-700 border border-gray-200 hover:border-red-200 rounded-lg text-xs font-semibold shadow-sm transition-all cursor-pointer"
                   >
-                    Reset
+                    Remove Image
                   </button>
                 )}
               </div>

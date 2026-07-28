@@ -172,15 +172,36 @@ export interface AnnualEvent {
 }
 
 const DEFAULT_EVENTS: Omit<AnnualEvent, 'id'>[] = [
-  { name: 'Science Exhibition', icon_name: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=600&auto=format&fit=crop&q=80', color: 'bg-blue-50 text-blue-600' },
-  { name: '15th Aug Independence Day', icon_name: 'https://images.unsplash.com/photo-1532375810709-75b1da00537c?w=600&auto=format&fit=crop&q=80', color: 'bg-orange-50 text-orange-600' },
-  { name: '26th Jan Republic Day', icon_name: 'https://images.unsplash.com/photo-1599661046289-e31897846e41?w=600&auto=format&fit=crop&q=80', color: 'bg-green-50 text-green-600' },
-  { name: 'School Foundation Day', icon_name: 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=600&auto=format&fit=crop&q=80', color: 'bg-purple-50 text-purple-600' },
-  { name: 'Ramazan Iftaar Program', icon_name: 'https://images.unsplash.com/photo-1581078426770-6d336e5de7bf?w=600&auto=format&fit=crop&q=80', color: 'bg-emerald-50 text-emerald-600' },
-  { name: 'Annual Day Celebration', icon_name: 'https://images.unsplash.com/photo-1511578314322-379afb476865?w=600&auto=format&fit=crop&q=80', color: 'bg-pink-50 text-pink-600' }
+  { name: 'Science Exhibition', icon_name: 'FlaskConical', color: 'bg-blue-50 text-blue-600' },
+  { name: '15th Aug Independence Day', icon_name: 'Flag', color: 'bg-orange-50 text-orange-600' },
+  { name: '26th Jan Republic Day', icon_name: 'Flag', color: 'bg-green-50 text-green-600' },
+  { name: 'School Foundation Day', icon_name: 'Calendar', color: 'bg-purple-50 text-purple-600' },
+  { name: 'Ramazan Iftaar Program', icon_name: 'Moon', color: 'bg-emerald-50 text-emerald-600' },
+  { name: 'Annual Day Celebration', icon_name: 'Sparkles', color: 'bg-pink-50 text-pink-600' }
 ];
 
 const EVENTS_LOCAL_KEY = 'haque:annual_events_v2';
+
+export function sanitizeEventIcon(iconName: string, eventName: string): string {
+  if (!iconName) return 'Calendar';
+  if (iconName.includes('images.unsplash.com/photo-')) {
+    const nameLower = eventName.toLowerCase();
+    if (nameLower.includes('science') || nameLower.includes('exhibition') || nameLower.includes('lab') || nameLower.includes('fair') || nameLower.includes('project') || nameLower.includes('math') || nameLower.includes('tech')) return 'FlaskConical';
+    if (nameLower.includes('independence') || nameLower.includes('republic') || nameLower.includes('flag') || nameLower.includes('aug') || nameLower.includes('jan')) return 'Flag';
+    if (nameLower.includes('ramazan') || nameLower.includes('iftaar') || nameLower.includes('eid') || nameLower.includes('islamic') || nameLower.includes('moon')) return 'Moon';
+    if (nameLower.includes('graduation') || nameLower.includes('convocation') || nameLower.includes('cap')) return 'GraduationCap';
+    if (nameLower.includes('award') || nameLower.includes('prize') || nameLower.includes('merit')) return 'Award';
+    if (nameLower.includes('sports') || nameLower.includes('trophy') || nameLower.includes('winner')) return 'Trophy';
+    if (nameLower.includes('music') || nameLower.includes('song') || nameLower.includes('dance') || nameLower.includes('cultural')) return 'Music';
+    if (nameLower.includes('book') || nameLower.includes('library') || nameLower.includes('study')) return 'BookOpen';
+    if (nameLower.includes('celebration') || nameLower.includes('sparkles') || nameLower.includes('festival') || nameLower.includes('annual')) return 'Sparkles';
+    if (nameLower.includes('parent') || nameLower.includes('meeting') || nameLower.includes('reunion') || nameLower.includes('community')) return 'Users';
+    if (nameLower.includes('speech') || nameLower.includes('mic') || nameLower.includes('debate')) return 'Mic';
+    if (nameLower.includes('foundation') || nameLower.includes('day') || nameLower.includes('calendar')) return 'Calendar';
+    return 'Calendar';
+  }
+  return iconName;
+}
 
 export function getLocalEvents(): AnnualEvent[] {
   const data = localStorage.getItem(EVENTS_LOCAL_KEY);
@@ -194,7 +215,12 @@ export function getLocalEvents(): AnnualEvent[] {
     return seeded;
   }
   try {
-    return JSON.parse(data);
+    const parsed: AnnualEvent[] = JSON.parse(data);
+    const sanitized = parsed.map(ev => ({
+      ...ev,
+      icon_name: sanitizeEventIcon(ev.icon_name, ev.name)
+    }));
+    return sanitized;
   } catch (e) {
     console.error('Failed to parse local events, resetting', e);
     return [];
@@ -202,7 +228,11 @@ export function getLocalEvents(): AnnualEvent[] {
 }
 
 function saveLocalEvents(events: AnnualEvent[]): void {
-  localStorage.setItem(EVENTS_LOCAL_KEY, JSON.stringify(events));
+  const sanitized = events.map(ev => ({
+    ...ev,
+    icon_name: sanitizeEventIcon(ev.icon_name, ev.name)
+  }));
+  localStorage.setItem(EVENTS_LOCAL_KEY, JSON.stringify(sanitized));
 }
 
 // Helper to convert base64 image string to file and upload to Supabase storage
@@ -235,7 +265,24 @@ export async function fetchAnnualEvents(): Promise<AnnualEvent[]> {
     }
 
     if (dbData) {
-      const dbEvents = dbData as AnnualEvent[];
+      if (dbData.length === 0 && !localStorage.getItem('haque:events_initialized')) {
+        // Seed DEFAULT_EVENTS to Supabase if table is empty for the first time
+        const insertedEvents: AnnualEvent[] = [];
+        for (const defEv of DEFAULT_EVENTS) {
+          const { data } = await supabase.from('annual_events').insert(defEv).select().single();
+          if (data) insertedEvents.push(data as AnnualEvent);
+        }
+        localStorage.setItem('haque:events_initialized', 'true');
+        if (insertedEvents.length > 0) {
+          saveLocalEvents(insertedEvents);
+          return insertedEvents;
+        }
+      }
+      localStorage.setItem('haque:events_initialized', 'true');
+      const dbEvents = (dbData as AnnualEvent[]).map(ev => ({
+        ...ev,
+        icon_name: sanitizeEventIcon(ev.icon_name, ev.name)
+      }));
       saveLocalEvents(dbEvents);
       return dbEvents;
     }
