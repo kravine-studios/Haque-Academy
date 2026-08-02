@@ -144,10 +144,10 @@ function EventForm({
     };
 
     if (editing) {
-      const ok = await updateAnnualEvent(editing.id, payload);
-      if (!ok) {
+      const { success, error: err } = await updateAnnualEvent(editing.id, payload);
+      if (!success) {
         setSaving(false);
-        setError('Failed to update event.');
+        setError(`Failed to update event: ${err || 'Unknown error'}`);
         return;
       }
     } else {
@@ -498,8 +498,12 @@ export default function ActivitiesSection() {
                             onClick={async (e) => {
                               e.stopPropagation();
                               if (confirm(`Delete the event "${event.name}"?`)) {
-                                setEvents((prev) => prev.filter((ev) => ev.id !== event.id));
-                                await deleteAnnualEvent(event.id);
+                                const { success, error: err } = await deleteAnnualEvent(event.id);
+                                if (success) {
+                                  setEvents((prev) => prev.filter((ev) => ev.id !== event.id));
+                                } else {
+                                  alert(`Failed to delete event: ${err || 'Unknown error'}`);
+                                }
                               }
                             }}
                             className="w-8 h-8 rounded-full bg-white shadow-md border border-gray-100 flex items-center justify-center hover:bg-red-50 hover:text-red-600 hover:scale-105 active:scale-95 transition-transform cursor-pointer"

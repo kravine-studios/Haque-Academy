@@ -304,35 +304,41 @@ export async function addAnnualEvent(event: Omit<AnnualEvent, 'id'>): Promise<{ 
 
   const payload = { ...event, icon_name: iconName };
 
-  try {
-    const { data, error } = await supabase.from('annual_events').insert(payload).select().single();
-    if (error) {
-      supabaseErr = error.message;
-      console.warn('Supabase addAnnualEvent failed, adding to local storage only:', error.message);
-    } else if (data) {
-      createdEvent = data as AnnualEvent;
+  if (supabaseConfigured) {
+    try {
+      const { data, error } = await supabase.from('annual_events').insert(payload).select().single();
+      if (error) {
+        supabaseErr = error.message;
+        console.warn('Supabase addAnnualEvent failed:', error.message);
+      } else if (data) {
+        createdEvent = data as AnnualEvent;
+      }
+    } catch (e) {
+      supabaseErr = e instanceof Error ? e.message : String(e);
+      console.warn('Supabase addAnnualEvent failed:', e);
     }
-  } catch (e) {
-    console.warn('Supabase addAnnualEvent failed, falling back to local storage:', e);
-  }
 
-  // Always update local storage
-  const localList = getLocalEvents();
-  if (!createdEvent) {
+    if (!createdEvent) {
+      return { event: null, error: supabaseErr || 'Failed to add event to database.' };
+    }
+  } else {
+    // Generate UUID/id locally when Supabase is not configured
     createdEvent = {
       ...payload,
       id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2)
     };
   }
+
+  // Update local storage
+  const localList = getLocalEvents();
   localList.push(createdEvent);
   saveLocalEvents(localList);
   notifyEventsChanged();
 
-  return { event: createdEvent, error: supabaseErr };
+  return { event: createdEvent, error: null };
 }
 
-export async function updateAnnualEvent(id: string, updatedFields: Partial<Omit<AnnualEvent, 'id'>>): Promise<boolean> {
-  let success = false;
+export async function updateAnnualEvent(id: string, updatedFields: Partial<Omit<AnnualEvent, 'id'>>): Promise<{ success: boolean; error: string | null }> {
   let fieldsToSave = { ...updatedFields };
 
   if (fieldsToSave.icon_name && fieldsToSave.icon_name.startsWith('data:image/')) {
@@ -340,15 +346,20 @@ export async function updateAnnualEvent(id: string, updatedFields: Partial<Omit<
     if (uploadedUrl) fieldsToSave.icon_name = uploadedUrl;
   }
 
-  try {
-    const { error } = await supabase.from('annual_events').update(fieldsToSave).eq('id', id);
-    if (!error) {
-      success = true;
-    } else {
-      console.warn('Supabase updateAnnualEvent failed:', error.message);
+  if (supabaseConfigured) {
+    try {
+      const { data, error } = await supabase.from('annual_events').update(fieldsToSave).eq('id', id).select();
+      if (error) {
+        console.warn('Supabase updateAnnualEvent failed:', error.message);
+        return { success: false, error: error.message };
+      }
+      if (!data || data.length === 0) {
+        return { success: false, error: 'Database access error (0 rows updated). Check if Row Level Security (RLS) policies permit you to update this row.' };
+      }
+    } catch (e) {
+      console.warn('Supabase updateAnnualEvent failed:', e);
+      return { success: false, error: e instanceof Error ? e.message : String(e) };
     }
-  } catch (e) {
-    console.warn('Supabase updateAnnualEvent failed, using local storage:', e);
   }
 
   // Update local storage
@@ -357,15 +368,12 @@ export async function updateAnnualEvent(id: string, updatedFields: Partial<Omit<
   if (index !== -1) {
     localList[index] = { ...localList[index], ...fieldsToSave };
     saveLocalEvents(localList);
-    success = true;
   }
   notifyEventsChanged();
-  return success;
+  return { success: true, error: null };
 }
 
-export async function deleteAnnualEvent(id: string): Promise<boolean> {
-  let success = false;
-
+export async function deleteAnnualEvent(id: string): Promise<{ success: boolean; error: string | null }> {
   // Check if target event has a storage image to clean up
   const existingList = getLocalEvents();
   const targetEvent = existingList.find(e => e.id === id);
@@ -378,15 +386,20 @@ export async function deleteAnnualEvent(id: string): Promise<boolean> {
     }
   }
 
-  try {
-    const { error } = await supabase.from('annual_events').delete().eq('id', id);
-    if (!error) {
-      success = true;
-    } else {
-      console.warn('Supabase deleteAnnualEvent failed:', error.message);
+  if (supabaseConfigured) {
+    try {
+      const { data, error } = await supabase.from('annual_events').delete().eq('id', id).select();
+      if (error) {
+        console.warn('Supabase deleteAnnualEvent failed:', error.message);
+        return { success: false, error: error.message };
+      }
+      if (!data || data.length === 0) {
+        return { success: false, error: 'Database access error (0 rows deleted). Check if Row Level Security (RLS) policies permit you to delete this row.' };
+      }
+    } catch (e) {
+      console.warn('Supabase deleteAnnualEvent failed:', e);
+      return { success: false, error: e instanceof Error ? e.message : String(e) };
     }
-  } catch (e) {
-    console.warn('Supabase deleteAnnualEvent failed, using local storage:', e);
   }
 
   // Update local storage
@@ -395,10 +408,9 @@ export async function deleteAnnualEvent(id: string): Promise<boolean> {
   localList = localList.filter(e => e.id !== id);
   if (localList.length !== initialLen) {
     saveLocalEvents(localList);
-    success = true;
   }
   notifyEventsChanged();
-  return success;
+  return { success: true, error: null };
 }
 
 export function notifyEventsChanged(): void {
