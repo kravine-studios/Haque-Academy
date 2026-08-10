@@ -171,15 +171,6 @@ export interface AnnualEvent {
   color: string;
 }
 
-const DEFAULT_EVENTS: Omit<AnnualEvent, 'id'>[] = [
-  { name: 'Science Exhibition', icon_name: 'FlaskConical', color: 'bg-blue-50 text-blue-600' },
-  { name: '15th Aug Independence Day', icon_name: 'Flag', color: 'bg-orange-50 text-orange-600' },
-  { name: '26th Jan Republic Day', icon_name: 'Flag', color: 'bg-green-50 text-green-600' },
-  { name: 'School Foundation Day', icon_name: 'Calendar', color: 'bg-purple-50 text-purple-600' },
-  { name: 'Ramazan Iftaar Program', icon_name: 'Moon', color: 'bg-emerald-50 text-emerald-600' },
-  { name: 'Annual Day Celebration', icon_name: 'Sparkles', color: 'bg-pink-50 text-pink-600' }
-];
-
 const EVENTS_LOCAL_KEY = 'haque:annual_events_v2';
 
 export function sanitizeEventIcon(iconName: string, eventName: string): string {
@@ -206,13 +197,8 @@ export function sanitizeEventIcon(iconName: string, eventName: string): string {
 export function getLocalEvents(): AnnualEvent[] {
   const data = localStorage.getItem(EVENTS_LOCAL_KEY);
   if (!data) {
-    // Generate UUIDs for default events
-    const seeded = DEFAULT_EVENTS.map(ev => ({
-      ...ev,
-      id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2)
-    }));
-    localStorage.setItem(EVENTS_LOCAL_KEY, JSON.stringify(seeded));
-    return seeded;
+    // No local cache yet — return empty, Supabase is the source of truth
+    return [];
   }
   try {
     const parsed: AnnualEvent[] = JSON.parse(data);
@@ -265,20 +251,12 @@ export async function fetchAnnualEvents(): Promise<AnnualEvent[]> {
     }
 
     if (dbData) {
-      if (dbData.length === 0 && !localStorage.getItem('haque:events_initialized')) {
-        // Seed DEFAULT_EVENTS to Supabase if table is empty for the first time
-        const insertedEvents: AnnualEvent[] = [];
-        for (const defEv of DEFAULT_EVENTS) {
-          const { data } = await supabase.from('annual_events').insert(defEv).select().single();
-          if (data) insertedEvents.push(data as AnnualEvent);
-        }
-        localStorage.setItem('haque:events_initialized', 'true');
-        if (insertedEvents.length > 0) {
-          saveLocalEvents(insertedEvents);
-          return insertedEvents;
-        }
+      if (dbData.length === 0) {
+        // Table is empty — return empty list, do not auto-seed.
+        // Events are managed exclusively through admin mode.
+        saveLocalEvents([]);
+        return [];
       }
-      localStorage.setItem('haque:events_initialized', 'true');
       const dbEvents = (dbData as AnnualEvent[]).map(ev => ({
         ...ev,
         icon_name: sanitizeEventIcon(ev.icon_name, ev.name)
