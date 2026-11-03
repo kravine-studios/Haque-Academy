@@ -333,8 +333,13 @@ export default function ActivitiesSection() {
   const [editingEvent, setEditingEvent] = useState<AnnualEvent | null>(null);
 
   const loadEvents = async () => {
-    const data = await fetchAnnualEvents();
-    setEvents(data);
+    setLoadingEvents(true);
+    try {
+      const data = await fetchAnnualEvents();
+      setEvents(data);
+    } finally {
+      setLoadingEvents(false);
+    }
   };
 
   useEffect(() => {

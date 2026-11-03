@@ -195,6 +195,13 @@ export function sanitizeEventIcon(iconName: string, eventName: string): string {
 }
 
 export function getLocalEvents(): AnnualEvent[] {
+  if (supabaseConfigured) {
+    // Keep localStorage as a temporary client cache only for offline UI state.
+    // Production data is sourced from Supabase and stale browser cache must not
+    // resurrect deleted/sample entries when the DB responds successfully.
+    return [];
+  }
+
   const data = localStorage.getItem(EVENTS_LOCAL_KEY);
   if (!data) {
     // No local cache yet — return empty, Supabase is the source of truth
@@ -218,6 +225,12 @@ function saveLocalEvents(events: AnnualEvent[]): void {
     ...ev,
     icon_name: sanitizeEventIcon(ev.icon_name, ev.name)
   }));
+
+  if (sanitized.length === 0) {
+    localStorage.removeItem(EVENTS_LOCAL_KEY);
+    return;
+  }
+
   localStorage.setItem(EVENTS_LOCAL_KEY, JSON.stringify(sanitized));
 }
 
@@ -246,8 +259,8 @@ export async function fetchAnnualEvents(): Promise<AnnualEvent[]> {
       .order('created_at', { ascending: true });
 
     if (error) {
-      console.warn('Supabase fetchAnnualEvents failed, falling back to localStorage:', error.message);
-      return getLocalEvents();
+      console.warn('Supabase fetchAnnualEvents failed, ignoring stale local cache:', error.message);
+      return supabaseConfigured ? [] : getLocalEvents();
     }
 
     if (dbData) {
@@ -265,9 +278,9 @@ export async function fetchAnnualEvents(): Promise<AnnualEvent[]> {
       return dbEvents;
     }
   } catch (e) {
-    console.warn('Supabase annual_events fetch failed, using local storage fallback:', e);
+    console.warn('Supabase annual_events fetch failed, ignoring stale local cache:', e);
   }
-  return getLocalEvents();
+  return supabaseConfigured ? [] : getLocalEvents();
 }
 
 export async function addAnnualEvent(event: Omit<AnnualEvent, 'id'>): Promise<{ event: AnnualEvent | null; error: string | null }> {

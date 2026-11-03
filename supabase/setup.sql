@@ -173,12 +173,6 @@ create policy "Public can delete annual_events"
   on annual_events for delete
   using (true);
 
--- Seed default events
-insert into annual_events (name, icon_name, color) values
-  ('Science Exhibition', 'FlaskConical', 'bg-blue-50 text-blue-600'),
-  ('15th Aug Independence Day', 'Flag', 'bg-orange-50 text-orange-600'),
-  ('26th Jan Republic Day', 'Flag', 'bg-green-50 text-green-600'),
-  ('School Foundation Day', 'Calendar', 'bg-purple-50 text-purple-600'),
-  ('Ramazan Iftaar Program', 'Moon', 'bg-emerald-50 text-emerald-600'),
-  ('Annual Day Celebration', 'GraduationCap', 'bg-pink-50 text-pink-600')
-on conflict do nothing;
+-- Intentionally keep annual_events empty on setup.
+-- Legitimate events are created and managed through the admin dashboard only.
+-- Any sample or demo entries must not be re-seeded during project setup or redeploys.
